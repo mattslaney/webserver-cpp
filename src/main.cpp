@@ -1,6 +1,13 @@
 #include <iostream>
 
+#include "SimpleWebServer.h"
+
 int main() {
-  std::cout << "Hello, World" << std::endl;
+  using namespace sws;
+
+  std::cout << "Starting Simple Web Server" << std::endl;
+
+  Server server = Server("127.0.0.1", 8080);
+
   return 0;
 }
