@@ -4,6 +4,7 @@
  *  Description: A very simple web server written in C++
  */
 #include "SimpleWebServer.h"
+#include <cstdint>
 #include <exception>
 
 #define MAX_CONNECTIONS 5
@@ -14,7 +15,8 @@
  */
 namespace sws {
 
-  Server::Server(const std::string &ipAddress, int port) {
+  Server::Server(const std::string &ipAddress, int port)
+    : m_socket(-1), m_address({}){
     startServer(ipAddress, port);
   }
 
@@ -99,7 +101,7 @@ namespace sws {
     fileStream.seekg(0, std::ios::beg);
 
     // Allocate memory for contentss
-    contents.resize(fileSize);
+    contents.resize(static_cast<std::string::size_type>(fileSize));
 
     // Read file contents into variable contents
     if (!fileStream.read(&contents[0], fileSize)) {
@@ -124,7 +126,7 @@ namespace sws {
   int Server::bindSocket(const std::string &ipAddress, int port) {
     m_address.sin_family = AF_INET;
     m_address.sin_addr.s_addr = inet_addr(ipAddress.c_str());
-    m_address.sin_port = htons(port);
+    m_address.sin_port = htons(static_cast<uint16_t>(port));
     if (bind(m_socket, (sockaddr*)&m_address, sizeof(m_address)) < 0) {
       std::cerr << "Could not bind to port: " << port << "\n";
       exit(1);
