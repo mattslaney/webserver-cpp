@@ -3,11 +3,9 @@
  *  Author: Matt Slaney
  *  Description: A very simple multi-threaded web server written in C++
  */
-#include <chrono>
 #include <cstdint>
 #include <exception>
 #include <thread>
-#include <random>
 
 #include "SimpleWebServer.h"
 #include "ThreadPool.h"
@@ -21,12 +19,16 @@
 namespace sws {
 
   Server::Server(const std::string &ipAddress, int port)
-    : m_socket(-1), m_address({}){
-    startServer(ipAddress, port);
+    : m_ip(ipAddress), m_port(port), m_socket(-1), m_address({}), running(true) { }
+
+  Server::~Server() { }
+
+  void Server::start() {
+    startServer();
   }
 
-  Server::~Server() {
-    stopServer();
+  void Server::stop() {
+    running.store(false);
   }
 
   void Server::handleRequest(int clientSocket) {
@@ -52,7 +54,7 @@ namespace sws {
       std::cerr << "[" << threadId << "] "
         << "Could not receive data from the client" << std::endl;
       //close(clientSocket);
-      return "/";
+      return "/index.html";
     }
     buffer[bytesRead] = '\0';
 
@@ -125,7 +127,7 @@ namespace sws {
   int Server::createSocket() {
     m_socket = socket(AF_INET, SOCK_STREAM, 0);
     if(m_socket < 0) {
-      std::cerr << "Could not create socket" << std::endl;
+      std::cout << "Could not create socket" << std::endl;
       exit(1);
     } else {
       std::cout << "Created socket#: " << m_socket << "\n";
@@ -156,41 +158,39 @@ namespace sws {
 
     std::cout << "Server listening on port " << ntohs(m_address.sin_port) << "\n";
 
-    std::mt19937 mt{};
-    std::uniform_int_distribution<int64_t> rand1000{ 0, 1000 };
-
-    while(true) {
+    while(running.load()) {
       sockaddr_in clientAddress;
       socklen_t clientAddressSize = sizeof(clientAddress);
       int clientSocket = accept(m_socket, (sockaddr*)&clientAddress, &clientAddressSize);
+
+      std::cout << "Client Address: " << clientAddress.sin_addr.s_addr
+        << " Client Socket: " << clientSocket
+        << std::endl;
+      
       if(clientSocket < 0) {
         std::cerr << "Could not accept connection" << std::endl;
         exit(1);
       }
 
-      pool.enqueue([this, &clientSocket, &mt, &rand1000](int threadNum) {
+      pool.enqueue([this, &clientSocket](int threadNum) {
         auto threadId = std::this_thread::get_id();
  
         std::cout << "\n[" << threadId << "] "
-          << "Handling request in thread # " << threadNum
-          << " with Id : " << threadId
+          << "Handling request for client " << clientSocket
+          << " in thread # " << threadNum
+          << " [" << threadId << "]"
           << std::endl;
 
         handleRequest(clientSocket);
-
-        // Sleep for a random duration between 0 and 1000
-        // TODO: Remove this when completely satisfied with multithreading
-        int64_t ms = rand1000(mt);
-        std::cout << "[" << threadId << "] "
-          << "Sleeping for " << ms << " milliseconds\n";
-        std::this_thread::sleep_for(std::chrono::milliseconds(ms));
       });
     }
+
+    stopServer();
   }
 
-  void Server::startServer(const std::string &ipAddress, int port) {
+  void Server::startServer() {
     createSocket();
-    bindSocket(ipAddress, port);
+    bindSocket(m_ip, m_port);
     run();
   }
 

@@ -18,6 +18,8 @@
         gnumake
         cmake
         clang-tools
+        mitmproxy
+        hey
       ];
 
       shellHook = ''

@@ -1,6 +1,7 @@
 #ifndef simple_server_h
 #define simple_server_h
 
+#include <atomic>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -15,10 +16,15 @@ namespace sws {
     public:
       Server(const std::string &ipAddress, int port);
       ~Server();
+      void start();
+      void stop();
 
     private:
+      std::string m_ip;
+      int m_port;
       int m_socket;
       sockaddr_in m_address;
+      std::atomic<bool> running;
 
       void handleRequest(int clientSocket);
       std::string receiveResponse(int clientSocket);
@@ -28,7 +34,7 @@ namespace sws {
       int createSocket();
       int bindSocket(const std::string &ipAddress, int port);
       void run();
-      void startServer(const std::string &ipAddress, int port);
+      void startServer();
       void stopServer();
   };
 }

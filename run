@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+# Function to display usage information
+usage() {
+    echo "Usage: $0 [options]"
+    echo "Options:"
+    echo "    -fresh      Clean target & run webserver"
+    echo "    -ltest      Run load test"
+    echo "    -utest      Run unit tests"
+    exit 1
+}
+
+# Default command
+command="./target/bin/webserver"
+
+# Parse command-line options
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -build)
+            command="make webserver && ./target/bin/webserver"
+            shift
+            ;;
+        -fresh)
+            command="make clean && make webserver && ./target/bin/webserver"
+            shift
+            ;;
+        -ltest)
+            ./target/bin/webserver &
+            webserver_pid=$!
+            command="hey -n 10 -c 10 -m GET http://127.0.0.1:8080/index.html"
+            echo "Web server started with PID: $webserver_pid"
+            shift
+            ;;
+        -utest)
+            command="make test"
+            shift
+            ;;
+        -info)
+            ps aux | grep webserver
+            netstat -tuln | grep :8080
+            lsof -i :8080
+            shift
+            exit
+            ;;
+        -kill)
+            pkill -9 webserver
+            pkill -9 hey
+            shift
+            exit
+            ;;
+        -h)
+            usage
+            shift
+            ;;
+        *)
+            echo "Error: Unknown option '$key'"
+            usage
+            ;;
+    esac
+done
+
+# Execute the command
+echo "$command"
+bash -c "$command"
