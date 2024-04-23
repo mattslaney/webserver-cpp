@@ -30,5 +30,5 @@ $(BINDIR):
 	mkdir -p $(BINDIR)
 
 clean:
-	rm -rf $(BINDIR)
+	rm -rf $(TGTDIR)
 

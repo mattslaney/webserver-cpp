@@ -14,9 +14,10 @@
       };
     in pkgs.mkShell {
       packages = with pkgs; [
-        gcc
+        gcc13
         gnumake
         cmake
+        clang-tools
       ];
 
       shellHook = ''

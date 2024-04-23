@@ -1,11 +1,16 @@
 /**
  *  Name: SimpleServer
  *  Author: Matt Slaney
- *  Description: A very simple web server written in C++
+ *  Description: A very simple multi-threaded web server written in C++
  */
-#include "SimpleWebServer.h"
+#include <chrono>
 #include <cstdint>
 #include <exception>
+#include <thread>
+#include <random>
+
+#include "SimpleWebServer.h"
+#include "ThreadPool.h"
 
 #define MAX_CONNECTIONS 5
 #define PUBLIC_DIR "public"
@@ -25,11 +30,13 @@ namespace sws {
   }
 
   void Server::handleRequest(int clientSocket) {
+    auto threadId = std::this_thread::get_id();
     try {
       std::string path = receiveResponse(clientSocket);
       sendResponse(clientSocket, path);
     } catch (const std::exception &e) {
-      std::cerr << "Exception handling request: " << e.what() << std::endl;
+      std::cerr << "[" << threadId << "] "
+        << "Exception handling request: " << e.what() << std::endl;
       std::string response = "HTTP/1.1 500 Internal Server Error\nContent-Type: text/plain\n\nInternal Server Error";
       send(clientSocket, response.c_str(), response.size(), 0);
       close(clientSocket);
@@ -41,7 +48,9 @@ namespace sws {
     char buffer[BUFFER_SIZE];
     ssize_t bytesRead = recv(clientSocket, buffer, BUFFER_SIZE - 1, 0);
     if (bytesRead < 0) {
-      std::cerr << "Could not receive data from the client" << std::endl;
+      auto threadId = std::this_thread::get_id();
+      std::cerr << "[" << threadId << "] "
+        << "Could not receive data from the client" << std::endl;
       //close(clientSocket);
       return "/";
     }
@@ -52,7 +61,9 @@ namespace sws {
     size_t pathEnd    = request.find(' ', pathStart);
     std::string path  = request.substr(pathStart, pathEnd - pathStart);
 
-    std::cout << "Client has requested path: " << path << std::endl;
+    auto threadId = std::this_thread::get_id();
+    std::cout << "[" << threadId << "] "
+      << "Client has requested path: " << path << std::endl;
     sanitisePath(path);
     return (PUBLIC_DIR + path);
   };
@@ -141,7 +152,12 @@ namespace sws {
       exit(1);
     }
 
+    ThreadPool pool(10);
+
     std::cout << "Server listening on port " << ntohs(m_address.sin_port) << "\n";
+
+    std::mt19937 mt{};
+    std::uniform_int_distribution<int64_t> rand1000{ 0, 1000 };
 
     while(true) {
       sockaddr_in clientAddress;
@@ -152,7 +168,23 @@ namespace sws {
         exit(1);
       }
 
-      handleRequest(clientSocket);
+      pool.enqueue([this, &clientSocket, &mt, &rand1000](int threadNum) {
+        auto threadId = std::this_thread::get_id();
+ 
+        std::cout << "\n[" << threadId << "] "
+          << "Handling request in thread # " << threadNum
+          << " with Id : " << threadId
+          << std::endl;
+
+        handleRequest(clientSocket);
+
+        // Sleep for a random duration between 0 and 1000
+        // TODO: Remove this when completely satisfied with multithreading
+        int64_t ms = rand1000(mt);
+        std::cout << "[" << threadId << "] "
+          << "Sleeping for " << ms << " milliseconds\n";
+        std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+      });
     }
   }
 
